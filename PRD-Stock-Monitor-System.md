@@ -198,6 +198,7 @@ resource "aws_iam_policy" "ec2_cloudwatch_policy" {
     Statement = [
       {
         Action = [
+          "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ],
@@ -299,7 +300,7 @@ resource "aws_launch_template" "app_lt" {
                 --log-driver=awslogs \
                 --log-opt awslogs-region=${data.aws_region.current.name} \
                 --log-opt awslogs-group=${aws_cloudwatch_log_group.app_logs.name} \
-                --log-opt awslogs-stream-prefix=${var.app_name} \
+                --log-opt awslogs-stream=${var.app_name} \
                 ${aws_ecr_repository.app_repo.repository_url}:latest
               EOF
   )
