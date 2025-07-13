@@ -1,0 +1,27 @@
+# Environment variables
+.env
+
+# Custom constants file
+constants.txt
+
+# Terraform files
+*.tfvars
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Go build files
+*.exe
+*.test
+*.out
+/vendor/
+
+# Lambda archives
+lambda/scale_up.zip
+lambda/scale_down.zip 

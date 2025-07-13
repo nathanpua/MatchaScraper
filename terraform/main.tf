@@ -249,8 +249,8 @@ resource "aws_autoscaling_group" "app_asg" {
 #---------------------------------------
 data "archive_file" "scale_up_lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda/scale_up"
-  output_path = "${path.module}/lambda/scale_up.zip"
+  source_dir  = "${path.module}/../lambda/scale_up"
+  output_path = "${path.module}/../lambda/scale_up.zip"
 }
 
 resource "aws_lambda_function" "scale_up_lambda" {
@@ -270,8 +270,8 @@ resource "aws_lambda_function" "scale_up_lambda" {
 
 data "archive_file" "scale_down_lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda/scale_down"
-  output_path = "${path.module}/lambda/scale_down.zip"
+  source_dir  = "${path.module}/../lambda/scale_down"
+  output_path = "${path.module}/../lambda/scale_down.zip"
 }
 
 resource "aws_lambda_function" "scale_down_lambda" {
