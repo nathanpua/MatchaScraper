@@ -1,5 +1,14 @@
 # main.tf
 
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 5.0"
+    }
+  }
+}
+
 provider "aws" {
   region = var.aws_region
 }
@@ -182,6 +191,45 @@ resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
 }
 
 #---------------------------------------
+# IAM Role for Scheduler
+#---------------------------------------
+resource "aws_iam_role" "scheduler_role" {
+  name = "${var.app_name}-scheduler-role"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [
+      {
+        Action    = "sts:AssumeRole",
+        Effect    = "Allow",
+        Principal = {
+          Service = "scheduler.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "scheduler_invoke_lambda_policy" {
+  name        = "${var.app_name}-scheduler-invoke-lambda-policy"
+  description = "Allows Scheduler to invoke Lambda functions"
+  policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [
+      {
+        Action   = "lambda:InvokeFunction",
+        Effect   = "Allow",
+        Resource = "*" # Allows invoking any lambda, can be restricted further
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "scheduler_invoke_lambda_attachment" {
+  role       = aws_iam_role.scheduler_role.name
+  policy_arn = aws_iam_policy.scheduler_invoke_lambda_policy.arn
+}
+
+#---------------------------------------
 # EC2 Auto Scaling Group and Launch Template
 #---------------------------------------
 resource "aws_launch_template" "app_lt" {
@@ -292,44 +340,38 @@ resource "aws_lambda_function" "scale_down_lambda" {
 #---------------------------------------
 # EventBridge Schedules & Permissions
 #---------------------------------------
-resource "aws_cloudwatch_event_rule" "start_rule" {
-  name                = "start-scraper-schedule"
-  description         = "Starts scraper instance at 10 AM UTC"
-  schedule_expression = "cron(0 10 * * ? *)"
+resource "aws_scheduler_schedule" "start_rule" {
+  name       = "start-scraper-schedule"
+  group_name = "default"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  schedule_expression          = "cron(0 10 * * ? *)"
+  schedule_expression_timezone = "Asia/Singapore"
+
+  target {
+    arn      = aws_lambda_function.scale_up_lambda.arn
+    role_arn = aws_iam_role.scheduler_role.arn
+  }
 }
 
-resource "aws_cloudwatch_event_target" "start_target" {
-  rule      = aws_cloudwatch_event_rule.start_rule.name
-  arn       = aws_lambda_function.scale_up_lambda.arn
-  target_id = "ScaleUpLambda"
-}
+resource "aws_scheduler_schedule" "stop_rule" {
+  name       = "stop-scraper-schedule"
+  group_name = "default"
 
-resource "aws_lambda_permission" "allow_start_eventbridge" {
-  statement_id  = "AllowExecutionFromEventBridge"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.scale_up_lambda.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.start_rule.arn
-}
+  flexible_time_window {
+    mode = "OFF"
+  }
 
-resource "aws_cloudwatch_event_rule" "stop_rule" {
-  name                = "stop-scraper-schedule"
-  description         = "Stops scraper instance at 10 PM UTC"
-  schedule_expression = "cron(0 22 * * ? *)"
-}
+  schedule_expression          = "cron(0 22 * * ? *)"
+  schedule_expression_timezone = "Asia/Singapore"
 
-resource "aws_cloudwatch_event_target" "stop_target" {
-  rule      = aws_cloudwatch_event_rule.stop_rule.name
-  arn       = aws_lambda_function.scale_down_lambda.arn
-  target_id = "ScaleDownLambda"
-}
-
-resource "aws_lambda_permission" "allow_stop_eventbridge" {
-  statement_id  = "AllowExecutionFromEventBridge"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.scale_down_lambda.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.stop_rule.arn
+  target {
+    arn      = aws_lambda_function.scale_down_lambda.arn
+    role_arn = aws_iam_role.scheduler_role.arn
+  }
 }
 
 #---------------------------------------
