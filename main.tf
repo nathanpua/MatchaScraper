@@ -25,18 +25,6 @@ variable "app_name" {
   default     = "ippodo-scraper"
 }
 
-variable "telegram_token" {
-  description = "The Telegram bot token."
-  type        = string
-  sensitive   = true
-}
-
-variable "telegram_chat_id" {
-  description = "The Telegram chat ID."
-  type        = string
-  sensitive   = true
-}
-
 #---------------------------------------
 # Data Sources
 #---------------------------------------
@@ -109,15 +97,38 @@ data "aws_iam_policy_document" "ec2_cloudwatch_policy" {
   }
 }
 
+data "aws_iam_policy_document" "ec2_ssm_policy" {
+  statement {
+    actions = [
+      "ssm:GetParameters"
+    ]
+    resources = [
+      "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/ippodo-scraper/telegram-token",
+      "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/ippodo-scraper/telegram-chat-id"
+    ]
+  }
+}
+
 resource "aws_iam_policy" "ec2_cloudwatch_policy" {
   name        = "${var.app_name}-ec2-cloudwatch-policy"
   description = "Allows EC2 instance to push logs to CloudWatch"
   policy      = data.aws_iam_policy_document.ec2_cloudwatch_policy.json
 }
 
+resource "aws_iam_policy" "ec2_ssm_policy" {
+  name        = "${var.app_name}-ec2-ssm-policy"
+  description = "Allows EC2 instance to read specific SSM parameters"
+  policy      = data.aws_iam_policy_document.ec2_ssm_policy.json
+}
+
 resource "aws_iam_role_policy_attachment" "ec2_ecr_readonly" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_ssm_attachment" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.ec2_ssm_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "ec2_cloudwatch_attachment" {
@@ -189,6 +200,10 @@ resource "aws_launch_template" "app_lt" {
               service docker start
               usermod -a -G docker ec2-user
 
+              # Fetch secrets from SSM Parameter Store
+              TELEGRAM_TOKEN=$(aws ssm get-parameter --name "/ippodo-scraper/telegram-token" --with-decryption --query "Parameter.Value" --output text --region ${data.aws_region.current.name})
+              TELEGRAM_CHAT_ID=$(aws ssm get-parameter --name "/ippodo-scraper/telegram-chat-id" --with-decryption --query "Parameter.Value" --output text --region ${data.aws_region.current.name})
+
               # Login to ECR
               aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com
 
@@ -198,8 +213,8 @@ resource "aws_launch_template" "app_lt" {
                 --log-opt awslogs-region=${data.aws_region.current.name} \
                 --log-opt awslogs-group=${aws_cloudwatch_log_group.app_logs.name} \
                 --log-opt awslogs-stream=${var.app_name} \
-                -e TELEGRAM_TOKEN='${var.telegram_token}' \
-                -e TELEGRAM_CHAT_ID='${var.telegram_chat_id}' \
+                -e TELEGRAM_TOKEN="$TELEGRAM_TOKEN" \
+                -e TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID" \
                 ${aws_ecr_repository.app_repo.repository_url}:latest
               EOF
   )
@@ -224,7 +239,8 @@ resource "aws_autoscaling_group" "app_asg" {
   # Ensure the ASG depends on the IAM role policies to avoid race conditions.
   depends_on = [
     aws_iam_role_policy_attachment.ec2_cloudwatch_attachment,
-    aws_iam_role_policy_attachment.ec2_ecr_readonly
+    aws_iam_role_policy_attachment.ec2_ecr_readonly,
+    aws_iam_role_policy_attachment.ec2_ssm_attachment
   ]
 }
 

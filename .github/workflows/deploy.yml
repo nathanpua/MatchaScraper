@@ -42,13 +42,7 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan
-        env:
-          TF_VAR_telegram_token: ${{ secrets.TELEGRAM_TOKEN }}
-          TF_VAR_telegram_chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: terraform plan -input=false
 
       - name: Terraform Apply
-        env:
-          TF_VAR_telegram_token: ${{ secrets.TELEGRAM_TOKEN }}
-          TF_VAR_telegram_chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: terraform apply -auto-approve -input=false 
