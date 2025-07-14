@@ -32,4 +32,4 @@ COPY --from=builder /main /main
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Command to run the executable
-CMD ["/main"] 
+CMD ["sh", "-c", "echo '--- Environment Variables ---' && printenv && echo '--- Starting Application ---' && /main"] 

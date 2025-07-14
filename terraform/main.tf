@@ -242,33 +242,74 @@ resource "aws_launch_template" "app_lt" {
   }
 
   user_data = base64encode(<<-EOF
-              #!/bin/bash
+              #!/bin/bash -ex
+              exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+              
+              echo "--- Starting User Data Script ---"
+              
               yum update -y
-              yum install -y docker
+              yum install -y docker aws-cli jq
+              echo "Dependencies installed."
+              
               service docker start
               usermod -a -G docker ec2-user
-
-              # Fetch secrets from SSM Parameter Store
-              TELEGRAM_TOKEN=$(aws ssm get-parameter --name "/ippodo-scraper/telegram-token" --with-decryption --query "Parameter.Value" --output text --region ${data.aws_region.current.name})
-              TELEGRAM_CHAT_ID=$(aws ssm get-parameter --name "/ippodo-scraper/telegram-chat-id" --with-decryption --query "Parameter.Value" --output text --region ${data.aws_region.current.name})
-
-              # Login to ECR
-              aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com
-
-              # Run the Docker container
-              docker run -d --restart always \
-                --log-driver=awslogs \
-                --log-opt awslogs-region=${data.aws_region.current.name} \
-                --log-opt awslogs-group=${aws_cloudwatch_log_group.app_logs.name} \
-                --log-opt awslogs-stream=${var.app_name} \
+              echo "Docker service started."
+              
+              TELEGRAM_TOKEN=$(aws ssm get-parameter --name "ippodo-scraper/telegram-token" --with-decryption --query "Parameter.Value" --output text --region ${var.aws_region})
+              if [ -z "$TELEGRAM_TOKEN" ]; then
+                  echo "ERROR: Failed to retrieve TELEGRAM_TOKEN."
+                  exit 1
+              fi
+              
+              TELEGRAM_CHAT_ID=$(aws ssm get-parameter --name "ippodo-scraper/telegram-chat-id" --with-decryption --query "Parameter.Value" --output text --region ${var.aws_region})
+              if [ -z "$TELEGRAM_CHAT_ID" ]; then
+                  echo "ERROR: Failed to retrieve TELEGRAM_CHAT_ID."
+                  exit 1
+              fi
+              echo "Successfully retrieved secrets."
+              
+              aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com
+              echo "Successfully logged in to ECR."
+              
+              echo "Running Docker container..."
+              docker run -d --restart unless-stopped \
                 -e TELEGRAM_TOKEN="$TELEGRAM_TOKEN" \
                 -e TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID" \
+                -e AWS_REGION="${var.aws_region}" \
+                --log-driver=awslogs \
+                --log-opt awslogs-group="${aws_cloudwatch_log_group.app_logs.name}" \
+                --log-opt awslogs-region="${var.aws_region}" \
+                --log-opt awslogs-stream-prefix="${var.app_name}" \
                 ${aws_ecr_repository.app_repo.repository_url}:latest
+              
+              echo "--- User Data Script Finished ---"
               EOF
   )
 
+  network_interfaces {
+    associate_public_ip_address = true
+  }
+
+  vpc_security_group_ids = [aws_security_group.app_sg.id]
+
   tags = {
     Name = var.app_name
+  }
+}
+
+resource "aws_security_group" "app_sg" {
+  name        = "${var.app_name}-sg"
+  description = "Security group for the scraper application"
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.app_name}-sg"
   }
 }
 

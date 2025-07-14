@@ -89,7 +89,8 @@ func processProducts(result ScrapeResult) {
 
 	for _, p := range result.Products {
 		// If the product was previously known to be out of stock and is now in stock, alert it.
-		if previousState, exists := productStates[p.Name]; exists && !previousState && p.InStock {
+		// if previousState, exists := productStates[p.Name]; exists && !previousState && p.InStock {
+		if previousState, exists := productStates[p.Name]; (!exists || !previousState) && p.InStock {
 			log.Printf("🚨 RESTOCK ALERT: %s is back in stock!", p.Name)
 			SendTelegramRestockAlert(result.SiteName, p.Name)
 			restockedProducts = append(restockedProducts, p.Name)
