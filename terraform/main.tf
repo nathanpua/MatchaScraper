@@ -109,6 +109,7 @@ data "aws_iam_policy_document" "ec2_cloudwatch_policy" {
 data "aws_iam_policy_document" "ec2_ssm_policy" {
   statement {
     actions = [
+      "ssm:GetParameter",
       "ssm:GetParameters"
     ]
     resources = [
