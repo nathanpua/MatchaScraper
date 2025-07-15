@@ -31,7 +31,7 @@ func main() {
 
 	// Perform an initial check immediately.
 	runChecks()
-	isFirstRun = false
+	isFirstRun = true
 
 	// Ticker for periodic checks.
 	ticker := time.NewTicker(CheckInterval)

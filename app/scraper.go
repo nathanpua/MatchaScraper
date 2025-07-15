@@ -89,11 +89,8 @@ func ScrapeNakamura(url string) ([]Product, error) {
 	config := SiteConfig{
 		URL:             url,
 		ProductSelector: "li.grid__item",
-		// The NameSelector is still useful for the generic function,
-		// but we provide a specific scraper func for precision.
-		NameSelector: "h3.card__heading a",
+		NameSelector:    "h3.card__heading a",
 		NameScraperFunc: func(e *colly.HTMLElement) string {
-			// This specifically mimics the original, correct scraping logic.
 			return strings.TrimSpace(e.DOM.Find("h3.card__heading a").First().Text())
 		},
 		PriceSelector: ".price__regular .price-item--regular",
@@ -102,7 +99,52 @@ func ScrapeNakamura(url string) ([]Product, error) {
 		},
 		Blacklist: []string{"Teaware", "Matcha Starter", "Matcha Standard"},
 	}
-	return scrapeSite(config)
+	return scrapeNakamuraWithLinks(config)
+}
+
+// scrapeNakamuraWithLinks is a specialized function for Nakamura to capture product links
+func scrapeNakamuraWithLinks(config SiteConfig) ([]Product, error) {
+	c := colly.NewCollector()
+	var products []Product
+	var scrapeErr error
+
+	c.OnHTML(config.ProductSelector, func(e *colly.HTMLElement) {
+		var productName string
+		if config.NameScraperFunc != nil {
+			productName = config.NameScraperFunc(e)
+		} else {
+			productName = strings.TrimSpace(e.ChildText(config.NameSelector))
+		}
+
+		for _, blacklistedWord := range config.Blacklist {
+			if strings.Contains(productName, blacklistedWord) {
+				return // Skip blacklisted item
+			}
+		}
+
+		// Extract the product URL from the link
+		productURL := e.ChildAttr("h3.card__heading a", "href")
+		if productURL != "" && !strings.HasPrefix(productURL, "http") {
+			productURL = "https://global.tokichi.jp" + productURL
+		}
+
+		product := Product{
+			Name:    productName,
+			Price:   e.ChildText(config.PriceSelector),
+			InStock: !config.IsOutOfStockFunc(e),
+			URL:     productURL,
+		}
+		products = append(products, product)
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		scrapeErr = fmt.Errorf("request to %s failed with status %d: %w", r.Request.URL, r.StatusCode, err)
+		log.Println(scrapeErr)
+	})
+
+	c.Visit(config.URL)
+
+	return products, scrapeErr
 }
 
 // scrapeSite is a generic function to scrape a website based on a given configuration.
