@@ -22,6 +22,11 @@ override.tf.json
 *.out
 /vendor/
 
+# Go binaries (compiled executables)
+app/IppodoScraper
+app/main
+app/*.bin
+
 # Lambda archives
 lambda/scale_up.zip
 lambda/scale_down.zip 

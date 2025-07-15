@@ -61,7 +61,7 @@ func SendTelegramRestockAlert(brandName, productName, link string) {
 		log.Printf("Failed to initialize Telegram service: %v", err)
 		return
 	}
-	message := fmt.Sprintf("🍵%s IN STOCK:\n📦<b>%s</b>\n🔗%s", strings.ToUpper(brandName), productName, link)
+	message := fmt.Sprintf("🍵 %s IN STOCK:\n📦 <b>%s</b>\n🔗 %s", strings.ToUpper(brandName), productName, link)
 	service.SendMessage(message, true)
 	log.Printf("Successfully sent restock notification for: %s", productName)
 }

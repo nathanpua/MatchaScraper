@@ -147,6 +147,64 @@ func scrapeNakamuraWithLinks(config SiteConfig) ([]Product, error) {
 	return products, scrapeErr
 }
 
+// ScrapeMarukyu scrapes products from the Marukyu website.
+func ScrapeMarukyu(url string) ([]Product, error) {
+	config := SiteConfig{
+		URL:             url,
+		ProductSelector: "li.product",
+		NameSelector:    ".product-name h4",
+		PriceSelector:   ".product-price .woocs_price_code.woocs_price_USD .woocommerce-Price-amount",
+		IsOutOfStockFunc: func(e *colly.HTMLElement) bool {
+			classes := e.Attr("class")
+			return strings.Contains(classes, "outofstock")
+		},
+		Blacklist: []string{}, // Add blacklisted terms if needed
+	}
+	return scrapeMarukyuWithLinks(config)
+}
+
+// scrapeMarukyuWithLinks is a specialized function for Marukyu to capture product links
+func scrapeMarukyuWithLinks(config SiteConfig) ([]Product, error) {
+	c := colly.NewCollector()
+	var products []Product
+	var scrapeErr error
+
+	c.OnHTML(config.ProductSelector, func(e *colly.HTMLElement) {
+		var productName string
+		if config.NameScraperFunc != nil {
+			productName = config.NameScraperFunc(e)
+		} else {
+			productName = strings.TrimSpace(e.ChildText(config.NameSelector))
+		}
+
+		for _, blacklistedWord := range config.Blacklist {
+			if strings.Contains(productName, blacklistedWord) {
+				return // Skip blacklisted item
+			}
+		}
+
+		// Extract the product URL from the link
+		productURL := e.ChildAttr("a.woocommerce-loop-product__link", "href")
+
+		product := Product{
+			Name:    productName,
+			Price:   e.ChildText(config.PriceSelector),
+			InStock: !config.IsOutOfStockFunc(e),
+			URL:     productURL,
+		}
+		products = append(products, product)
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		scrapeErr = fmt.Errorf("request to %s failed with status %d: %w", r.Request.URL, r.StatusCode, err)
+		log.Println(scrapeErr)
+	})
+
+	c.Visit(config.URL)
+
+	return products, scrapeErr
+}
+
 // scrapeSite is a generic function to scrape a website based on a given configuration.
 func scrapeSite(config SiteConfig) ([]Product, error) {
 	c := colly.NewCollector()

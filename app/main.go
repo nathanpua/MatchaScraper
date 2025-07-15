@@ -31,7 +31,7 @@ func main() {
 
 	// Perform an initial check immediately.
 	runChecks()
-	isFirstRun = true
+	isFirstRun = false
 
 	// Ticker for periodic checks.
 	ticker := time.NewTicker(CheckInterval)
@@ -54,7 +54,7 @@ func runChecks() {
 	log.Println("Running stock check...")
 
 	var wg sync.WaitGroup
-	resultsChan := make(chan ScrapeResult, 2)
+	resultsChan := make(chan ScrapeResult, 3)
 
 	tasks := []struct {
 		siteName string
@@ -63,6 +63,7 @@ func runChecks() {
 	}{
 		{"Ippodo", IppodoURL, ScrapeIppodo},
 		{"Nakamura", NakamuraURL, ScrapeNakamura},
+		{"Marukyu", MarukyuURL, ScrapeMarukyu},
 	}
 
 	for _, task := range tasks {
