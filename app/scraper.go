@@ -13,6 +13,7 @@ type Product struct {
 	Name    string
 	Price   string
 	InStock bool
+	URL     string
 }
 
 // SiteConfig defines the selectors and rules for scraping a site.
@@ -40,7 +41,47 @@ func ScrapeIppodo(url string) ([]Product, error) {
 		},
 		Blacklist: []string{"Uji-Shimizu", "Fumi-no-tomo", "Packets"},
 	}
-	return scrapeSite(config)
+	return scrapeIppodoWithLinks(config)
+}
+
+// scrapeIppodoWithLinks is a specialized function for Ippodo to capture product links
+func scrapeIppodoWithLinks(config SiteConfig) ([]Product, error) {
+	c := colly.NewCollector()
+	var products []Product
+	var scrapeErr error
+
+	c.OnHTML(config.ProductSelector, func(e *colly.HTMLElement) {
+		productName := strings.TrimSpace(e.ChildText(config.NameSelector))
+
+		for _, blacklistedWord := range config.Blacklist {
+			if strings.Contains(productName, blacklistedWord) {
+				return // Skip blacklisted item
+			}
+		}
+
+		// Extract the product URL from the link
+		productURL := e.ChildAttr(".m-product-card__name a", "href")
+		if productURL != "" && !strings.HasPrefix(productURL, "http") {
+			productURL = "https://global.ippodo-tea.co.jp" + productURL
+		}
+
+		product := Product{
+			Name:    productName,
+			Price:   e.ChildText(config.PriceSelector),
+			InStock: !config.IsOutOfStockFunc(e),
+			URL:     productURL,
+		}
+		products = append(products, product)
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		scrapeErr = fmt.Errorf("request to %s failed with status %d: %w", r.Request.URL, r.StatusCode, err)
+		log.Println(scrapeErr)
+	})
+
+	c.Visit(config.URL)
+
+	return products, scrapeErr
 }
 
 // ScrapeNakamura scrapes products from the Nakamura website.
@@ -88,6 +129,7 @@ func scrapeSite(config SiteConfig) ([]Product, error) {
 			Name:    productName,
 			Price:   e.ChildText(config.PriceSelector),
 			InStock: !config.IsOutOfStockFunc(e),
+			URL:     "", // Nakamura doesn't have individual product URLs in the listing
 		}
 		products = append(products, product)
 	})

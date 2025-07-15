@@ -45,10 +45,8 @@ func NewTelegramService() (*TelegramService, error) {
 
 // SendMessage sends a formatted message to the configured Telegram chat.
 func (ts *TelegramService) SendMessage(text string, disablePreview bool) {
-	// Escape special characters for MarkdownV2.
-	escapedText := escapeMarkdownV2(text)
-	msg := tgbotapi.NewMessage(ts.ChatID, escapedText)
-	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	msg := tgbotapi.NewMessage(ts.ChatID, text)
+	msg.ParseMode = tgbotapi.ModeHTML
 	msg.DisableWebPagePreview = disablePreview
 
 	if _, err := ts.Bot.Send(msg); err != nil {
@@ -57,38 +55,13 @@ func (ts *TelegramService) SendMessage(text string, disablePreview bool) {
 }
 
 // SendTelegramRestockAlert sends a formatted restock notification.
-func SendTelegramRestockAlert(brandName, productName string) {
-	// This function now acts as a wrapper. In a larger app, you might have a
-	// central notification manager that uses the TelegramService.
-	// For now, we'll keep the direct initialization for simplicity of integration.
+func SendTelegramRestockAlert(brandName, productName, link string) {
 	service, err := NewTelegramService()
 	if err != nil {
 		log.Printf("Failed to initialize Telegram service: %v", err)
 		return
 	}
-	message := fmt.Sprintf("🍵 %s IN STOCK: *%s*", brandName, productName)
+	message := fmt.Sprintf("🍵%s IN STOCK:\n📦<b>%s</b>\n🔗%s", strings.ToUpper(brandName), productName, link)
 	service.SendMessage(message, true)
 	log.Printf("Successfully sent restock notification for: %s", productName)
-}
-
-// SendTelegramSummaryAlert sends a formatted summary notification.
-func SendTelegramSummaryAlert(brandName, websiteURL string, restockedCount int) {
-	service, err := NewTelegramService()
-	if err != nil {
-		log.Printf("Failed to initialize Telegram service: %v", err)
-		return
-	}
-	message := fmt.Sprintf("🍵 *%s IS IN STOCK*\nTotal Principal Matcha in stock: %d\n🔗 Link:\n%s", brandName, restockedCount, websiteURL)
-	service.SendMessage(message, false)
-	log.Printf("Successfully sent restock summary for: %s", brandName)
-}
-
-// escapeMarkdownV2 escapes characters that are special in Telegram's MarkdownV2 format.
-func escapeMarkdownV2(s string) string {
-	// Telegram's MarkdownV2 requires escaping of these special characters.
-	charsToEscape := []string{"_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"}
-	for _, char := range charsToEscape {
-		s = strings.ReplaceAll(s, char, "\\"+char)
-	}
-	return s
 }
