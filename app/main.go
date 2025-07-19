@@ -54,7 +54,7 @@ func runChecks() {
 	log.Println("Running stock check...")
 
 	var wg sync.WaitGroup
-	resultsChan := make(chan ScrapeResult, 3)
+	resultsChan := make(chan ScrapeResult, 4)
 
 	tasks := []struct {
 		siteName string
@@ -64,6 +64,7 @@ func runChecks() {
 		{"Ippodo", IppodoURL, ScrapeIppodo},
 		{"Nakamura", NakamuraURL, ScrapeNakamura},
 		{"Marukyu", MarukyuURL, ScrapeMarukyu},
+		{"Yamamasa Koyamaen", YamamasaKoyamaenURL, ScrapeYamamasaKoyamaen},
 	}
 
 	for _, task := range tasks {

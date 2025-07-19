@@ -14,7 +14,7 @@ import (
 // TelegramService holds the bot instance and chat ID.
 type TelegramService struct {
 	Bot    *tgbotapi.BotAPI
-	ChatID int64
+	ChatID string
 }
 
 // NewTelegramService initializes the Telegram bot and returns a service struct.
@@ -30,22 +30,26 @@ func NewTelegramService() (*TelegramService, error) {
 		return nil, fmt.Errorf("TELEGRAM_TOKEN or TELEGRAM_CHAT_ID not set")
 	}
 
-	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing TELEGRAM_CHAT_ID: %w", err)
-	}
-
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Telegram bot: %w", err)
 	}
 
-	return &TelegramService{Bot: bot, ChatID: chatID}, nil
+	return &TelegramService{Bot: bot, ChatID: chatIDStr}, nil
 }
 
 // SendMessage sends a formatted message to the configured Telegram chat.
 func (ts *TelegramService) SendMessage(text string, disablePreview bool) {
-	msg := tgbotapi.NewMessage(ts.ChatID, text)
+	var msg tgbotapi.MessageConfig
+
+	// Try to parse as int64 first (for numeric chat IDs)
+	if chatID, err := strconv.ParseInt(ts.ChatID, 10, 64); err == nil {
+		msg = tgbotapi.NewMessage(chatID, text)
+	} else {
+		// For string chat IDs (like @channel_name)
+		msg = tgbotapi.NewMessageToChannel(ts.ChatID, text)
+	}
+
 	msg.ParseMode = tgbotapi.ModeHTML
 	msg.DisableWebPagePreview = disablePreview
 

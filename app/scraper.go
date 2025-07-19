@@ -205,6 +205,90 @@ func scrapeMarukyuWithLinks(config SiteConfig) ([]Product, error) {
 	return products, scrapeErr
 }
 
+// ScrapeYamamasaKoyamaen scrapes products from the Yamamasa Koyamaen website via J-J Market.
+func ScrapeYamamasaKoyamaen(url string) ([]Product, error) {
+	config := SiteConfig{
+		URL:             url,
+		ProductSelector: "li.grid__item",
+		NameSelector:    "h3.card__heading a",
+		NameScraperFunc: func(e *colly.HTMLElement) string {
+			return strings.TrimSpace(e.DOM.Find("h3.card__heading a").First().Text())
+		},
+		PriceSelector: ".price-item.price-item--regular, .price-item.price-item--sale",
+		IsOutOfStockFunc: func(e *colly.HTMLElement) bool {
+			return e.DOM.Find("span.badge:contains('Sold out')").Length() > 0
+		},
+		Blacklist: []string{"Gift", "Set", "Teaware", "Culinary"},
+	}
+	return scrapeYamamasaKoyamaenWithLinks(config)
+}
+
+// scrapeYamamasaKoyamaenWithLinks is a specialized function for Yamamasa Koyamaen to capture product links
+func scrapeYamamasaKoyamaenWithLinks(config SiteConfig) ([]Product, error) {
+	c := colly.NewCollector()
+	var products []Product
+	var scrapeErr error
+
+	c.OnHTML(config.ProductSelector, func(e *colly.HTMLElement) {
+		var productName string
+		if config.NameScraperFunc != nil {
+			productName = config.NameScraperFunc(e)
+		} else {
+			productName = strings.TrimSpace(e.ChildText(config.NameSelector))
+		}
+
+		for _, blacklistedWord := range config.Blacklist {
+			if strings.Contains(productName, blacklistedWord) {
+				return // Skip blacklisted item
+			}
+		}
+
+		// Extract the product URL from the link
+		productURL := e.ChildAttr("h3.card__heading a", "href")
+		if productURL != "" && !strings.HasPrefix(productURL, "http") {
+			productURL = "https://j-j-market.com" + productURL
+		}
+
+		// Custom price extraction with cleaning
+		var price string
+		// Try to get sale price first, then regular price
+		salePriceElement := e.DOM.Find(".price-item.price-item--sale")
+		if salePriceElement.Length() > 0 {
+			price = strings.TrimSpace(salePriceElement.First().Text())
+		} else {
+			regularPriceElement := e.DOM.Find(".price-item.price-item--regular")
+			if regularPriceElement.Length() > 0 {
+				price = strings.TrimSpace(regularPriceElement.First().Text())
+			}
+		}
+		// Clean up any extra whitespace and newlines
+		price = strings.ReplaceAll(price, "\n", "")
+		price = strings.ReplaceAll(price, "\t", "")
+		// Replace multiple spaces with single space
+		for strings.Contains(price, "  ") {
+			price = strings.ReplaceAll(price, "  ", " ")
+		}
+		price = strings.TrimSpace(price)
+
+		product := Product{
+			Name:    productName,
+			Price:   price,
+			InStock: !config.IsOutOfStockFunc(e),
+			URL:     productURL,
+		}
+		products = append(products, product)
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		scrapeErr = fmt.Errorf("request to %s failed with status %d: %w", r.Request.URL, r.StatusCode, err)
+		log.Println(scrapeErr)
+	})
+
+	c.Visit(config.URL)
+
+	return products, scrapeErr
+}
+
 // scrapeSite is a generic function to scrape a website based on a given configuration.
 func scrapeSite(config SiteConfig) ([]Product, error) {
 	c := colly.NewCollector()
