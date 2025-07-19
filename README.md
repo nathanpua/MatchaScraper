@@ -1,9 +1,34 @@
 # MatchaScraper: A Cloud-Native Stock Monitoring System
 
+## 🛠️ Tech Stack
+
+### Application & Logic
+![Go](https://img.shields.io/badge/go-%2300ADD8.svg?style=for-the-badge&logo=go&logoColor=white)
+![Colly](https://img.shields.io/badge/Colly-Web%20Scraping-blue?style=for-the-badge&logo=spider&logoColor=white)
+![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)
+
+### Infrastructure & Cloud
+![AWS](https://img.shields.io/badge/AWS-%23FF9900.svg?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![Terraform](https://img.shields.io/badge/terraform-%235835CC.svg?style=for-the-badge&logo=terraform&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/github%20actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white)
+
+### AWS Services
+![Amazon EC2](https://img.shields.io/badge/Amazon%20EC2-FF9900?style=for-the-badge&logo=amazon-ec2&logoColor=white)
+![Amazon ECR](https://img.shields.io/badge/Amazon%20ECR-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![AWS Lambda](https://img.shields.io/badge/AWS%20Lambda-FF9900?style=for-the-badge&logo=aws-lambda&logoColor=white)
+![Amazon S3](https://img.shields.io/badge/Amazon%20S3-569A31?style=for-the-badge&logo=amazon-s3&logoColor=white)
+![Amazon DynamoDB](https://img.shields.io/badge/Amazon%20DynamoDB-4053D6?style=for-the-badge&logo=amazon-dynamodb&logoColor=white)
+![Amazon CloudWatch](https://img.shields.io/badge/Amazon%20CloudWatch-FF4F8B?style=for-the-badge&logo=amazon-cloudwatch&logoColor=white)
+![Amazon EventBridge](https://img.shields.io/badge/Amazon%20EventBridge-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![AWS SSM](https://img.shields.io/badge/AWS%20SSM-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white)
+
+---
+
 ### 1. Project Overview
 
 **Project Name:** MatchaScraper - An Advanced, Cloud-Native Stock Monitoring System  
-**Date:** 2025  
+**Date:** July 2025  
 
 ### 2. Executive Summary
 
@@ -12,8 +37,8 @@ This document outlines the architecture for a sophisticated, containerized scrap
 ### 3. Business Requirements
 
 #### 3.1 Primary Objectives
-- **Targeted Scraping:** Precisely scrape product data from `Ippodo` and `Nakamura`.
-- **High-Frequency Checks:** Refresh and validate product stock every minute.
+- **Targeted Scraping:** Precisely scrape product data from `Ippodo`, `Nakamura`, `MarukyuKoyamaen` and  `YamamasaKoyamaen`.
+- **High-Frequency Checks:** Refresh and validate product stock every 20s.
 - **Automated Scheduling:** Operate on a strict 12-hour daily schedule, starting at 10:00 AM.
 - **Instantaneous Alerts:** Deliver real-time Telegram notifications upon product restocks.
 
@@ -21,7 +46,7 @@ This document outlines the architecture for a sophisticated, containerized scrap
 - **Cost Efficiency:** Masterfully leverage the AWS Free Tier with a `t2.micro` instance and automated shutdowns to achieve near-zero cost.
 - **High Availability:** Guarantee 100% uptime during the 12-hour operational window through a resilient Auto Scaling Group.
 - **Data Accuracy:** Maintain 99.9% accuracy in stock detection.
-- **Alert Latency:** Achieve a sub-60-second response time from stock detection to notification delivery.
+- **Alert Latency:** Achieve a sub-30-second response time from stock detection to notification delivery.
 
 ### 4. Functional Requirements
 
@@ -39,7 +64,7 @@ The application's core logic—scraping, stock detection, and notifications—is
         └── The EC2 User Data script initiates the Docker container.
             │
             └── The Go application executes its continuous monitoring loop:
-                ├── Scrape Ippodo & Nakamura in parallel.
+                ├── Scrape 4 matcha websites in parallel.
                 ├── Detect restocks and dispatch instant alerts.
                 └── Pause for 1 minute before repeating the cycle.
             
@@ -89,35 +114,7 @@ The project follows a clean, modular structure to promote separation of concerns
 
 #### 6.3 System Architecture Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     AWS Cloud Infrastructure                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────────┐      ┌──────────────────┐     ┌───────────┐ │
-│  │ 🕒 EventBridge   │ ─► │  ⚡ ScaleUp Lambda │ ─►│ 💪 Auto   │ │
-│  │    (10 AM Cron)  │      │   (Updates ASG)  │     │   Scaling │ │
-│  └──────────────────┘      └──────────────────┘     │   Group   │ │
-│                                                     └─────┬─────┘ │
-│  ┌──────────────────┐      ┌──────────────────┐           │       │
-│  │ 🕒 EventBridge   │ ─► │ ⚡ ScaleDown      │ ◄─────────┘       │
-│  │    (10 PM Cron)  │      │    Lambda        │                   │
-│  └──────────────────┘      └──────────────────┘                   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       EC2 Instance Detail                       │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌────────────────────────┐      ┌───────────────────────────┐    │
-│  │ 🐳 Docker Daemon       │ ─► │ 🍵 MatchaScraper Container  │    │
-│  └────────────────────────┘      └───────────────────────────┘    │
-│                                  │                            │
-│                                  └─ Go Application (running)  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+![System Architecture Diagram](./architecture.png)
 
 ### 7. CI/CD Pipeline
 The entire build, test, and deployment lifecycle is fully automated using GitHub Actions. A push to the `main` branch triggers a workflow that executes the following strategic steps:
