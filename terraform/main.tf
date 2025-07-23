@@ -349,7 +349,7 @@ resource "aws_scheduler_schedule" "start_rule" {
     mode = "OFF"
   }
 
-  schedule_expression          = "cron(0 10 * * ? *)"
+  schedule_expression          = "cron(0 7 ? * MON-FRI *)"
   schedule_expression_timezone = "Asia/Singapore"
 
   target {
@@ -366,7 +366,7 @@ resource "aws_scheduler_schedule" "stop_rule" {
     mode = "OFF"
   }
 
-  schedule_expression          = "cron(0 22 * * ? *)"
+  schedule_expression          = "cron(0 17 ? * MON-FRI *)"
   schedule_expression_timezone = "Asia/Singapore"
 
   target {

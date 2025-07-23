@@ -61,10 +61,7 @@ func runChecks() {
 		siteURL  string
 		scrapeFn func(string) ([]Product, error)
 	}{
-		{"Ippodo", IppodoURL, ScrapeIppodo},
-		{"Nakamura", NakamuraURL, ScrapeNakamura},
 		{"Marukyu", MarukyuURL, ScrapeMarukyu},
-		{"Yamamasa Koyamaen", YamamasaKoyamaenURL, ScrapeYamamasaKoyamaen},
 	}
 
 	for _, task := range tasks {
